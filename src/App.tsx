@@ -37,6 +37,7 @@ function App() {
   const [showPairingSection, setShowPairingSection] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [displayNameInput, setDisplayNameInput] = useState('');
   
   // Geofence states
@@ -144,11 +145,13 @@ function App() {
         await audio.play().catch(e => console.warn('Audio play blocked:', e));
         
         setIsBackgroundActive(true);
-        alert(t('backgroundActive') + '\\n\\n' + t('backgroundHelp'));
+        setShowBackgroundModal(true);
       } catch (e: any) {
         console.error('Failed to enable background mode', e);
         alert('Could not enable background mode: ' + e.message);
       }
+    } else {
+      setShowBackgroundModal(true);
     }
   };
 
@@ -549,6 +552,52 @@ function App() {
         {locationError && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-900/90 backdrop-blur border border-red-800 px-6 py-2 rounded-full shadow-2xl z-[1000] flex items-center gap-2">
             <span className="text-xs font-medium text-red-200">Location Error: {locationError}</span>
+          </div>
+        )}
+
+        {/* Background Instructions Modal */}
+        {showBackgroundModal && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Activity className="text-indigo-400" size={24} />
+                  {t('backgroundInstructionsTitle')}
+                </h3>
+                <button onClick={() => setShowBackgroundModal(false)} className="text-zinc-400 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4 text-sm text-zinc-300">
+                <p className="bg-indigo-500/10 text-indigo-300 p-3 rounded-xl border border-indigo-500/20">
+                  {t('backgroundHelp')}
+                </p>
+                <ul className="space-y-3">
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 shrink-0" />
+                    <span>{t('backgroundInstructionsStep1')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 shrink-0" />
+                    <span>{t('backgroundInstructionsStep2')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 shrink-0" />
+                    <span>{t('backgroundInstructionsStep3')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 shrink-0" />
+                    <span>{t('backgroundInstructionsStep4')}</span>
+                  </li>
+                </ul>
+                <button
+                  onClick={() => setShowBackgroundModal(false)}
+                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-900/20"
+                >
+                  {t('close')}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

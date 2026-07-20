@@ -31,7 +31,13 @@ const resources = {
       "displayName": "Your Display Name",
       "updateName": "Update Name",
       "nameUpdated": "Name updated!",
-      "time": "Time"
+      "time": "Time",
+      "backgroundInstructionsTitle": "Keep App Running in Background",
+      "backgroundInstructionsStep1": "1. Install App: Tap 'Add to Home Screen' in your browser menu.",
+      "backgroundInstructionsStep2": "2. Allow Location: Go to device Settings > Apps > Browser/Together > Permissions > Location > 'Allow all the time' (or 'Always').",
+      "backgroundInstructionsStep3": "3. Unrestricted Battery: In Settings, allow 'Unrestricted' battery usage for this app to prevent it from sleeping.",
+      "backgroundInstructionsStep4": "4. Keep Open: Leave the app running in your recent apps screen (do not swipe it away).",
+      "close": "Close"
     }
   },
   th: {
@@ -63,7 +69,13 @@ const resources = {
       "displayName": "ชื่อแสดงของคุณ",
       "updateName": "อัปเดตชื่อ",
       "nameUpdated": "อัปเดตชื่อแล้ว!",
-      "time": "เวลา"
+      "time": "เวลา",
+      "backgroundInstructionsTitle": "ให้แอปทำงานเบื้องหลังตลอดเวลา",
+      "backgroundInstructionsStep1": "1. ติดตั้งแอป: กด 'เพิ่มลงในหน้าจอหลัก' ในเมนูเบราว์เซอร์ของคุณ",
+      "backgroundInstructionsStep2": "2. อนุญาตตำแหน่ง: ไปที่การตั้งค่าเครื่อง > แอป > เบราว์เซอร์/แอป > สิทธิ์ > ตำแหน่ง > 'อนุญาตตลอดเวลา' (หรือ 'เสมอ')",
+      "backgroundInstructionsStep3": "3. แบตเตอรี่ไม่จำกัด: ในการตั้งค่า อนุญาตการใช้แบตเตอรี่แบบ 'ไม่จำกัด' (Unrestricted) เพื่อไม่ให้แอปหลับ",
+      "backgroundInstructionsStep4": "4. เปิดแอปทิ้งไว้: ปล่อยให้แอปทำงานในพื้นหลัง (อย่าปัดทิ้งจากหน้า रिसेंटแอป)",
+      "close": "ปิด"
     }
   }
 };
