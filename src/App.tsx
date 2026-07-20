@@ -128,12 +128,31 @@ function App() {
     }
   }, [userDoc?.displayName]);
 
+  const wakeLockRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (isBackgroundActive && document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        } catch (err) {
+          console.warn('Failed to re-acquire wake lock', err);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isBackgroundActive]);
+
   const toggleBackgroundMode = async () => {
     if (!isBackgroundActive) {
       try {
         if ('wakeLock' in navigator) {
           try {
-            await (navigator as any).wakeLock.request('screen');
+            wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
           } catch (wakeLockError) {
             console.warn('Wake lock failed (often blocked in iframes), continuing with audio fallback:', wakeLockError);
           }
