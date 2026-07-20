@@ -8,8 +8,21 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
   const [partnerUid, setPartnerUid] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [permissionState, setPermissionState] = useState<PermissionState | 'unknown'>('unknown');
   const watchIdRef = useRef<number | null>(null);
   const lastHistoryPointRef = useRef<HistoryPoint | null>(null);
+
+  // Check initial permission state
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+        setPermissionState(status.state);
+        status.onchange = () => {
+          setPermissionState(status.state);
+        };
+      }).catch(e => console.warn('Permissions API not supported', e));
+    }
+  }, []);
 
   // 1. Listen to the current user's doc to get the partner's UID
   useEffect(() => {
@@ -132,6 +145,9 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
         },
         (error) => {
           console.error('Geolocation error:', error);
+          if (error.code === 1) { // PERMISSION_DENIED
+            setPermissionState('denied');
+          }
           setLocationError(error.message);
         },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
@@ -147,5 +163,5 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
     };
   }, [uid, ghostMode]);
 
-  return { partnerLocation, partnerUid, partnerName, locationError };
+  return { partnerLocation, partnerUid, partnerName, locationError, permissionState };
 }

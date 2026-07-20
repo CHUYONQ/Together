@@ -6,7 +6,7 @@ import { doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useLocationTracker } from './useLocationTracker';
 import { MapComponent } from './MapComponent';
 import { UserLocation, UserDoc, Geofence } from './types';
-import { Ghost, Globe, Link2, Unlink, Copy, Check, ShieldAlert, Activity, ChevronDown, ChevronUp, UserPen, Save, History, MapPin, X, Trash2 } from 'lucide-react';
+import { Ghost, Globe, Link2, Unlink, Copy, Check, ShieldAlert, Activity, ChevronDown, ChevronUp, UserPen, Save, History, MapPin, X, Trash2, MapPinOff } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useLocationHistory } from './useLocationHistory';
 
@@ -44,7 +44,7 @@ function App() {
   const [isMarkingLocation, setIsMarkingLocation] = useState(false);
   const [newGeofenceDraft, setNewGeofenceDraft] = useState<Partial<Geofence> | null>(null);
 
-  const { partnerLocation, partnerUid, partnerName, locationError } = useLocationTracker(user?.uid || null, ghostMode);
+  const { partnerLocation, partnerUid, partnerName, locationError, permissionState } = useLocationTracker(user?.uid || null, ghostMode);
 
   const [partnerSpeed, setPartnerSpeed] = useState<number | null>(null);
 
@@ -595,6 +595,49 @@ function App() {
                   className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-900/20"
                 >
                   {t('close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Location Permission Modal */}
+        {permissionState === 'denied' && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-red-900/50 p-6 rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                  <MapPinOff size={24} />
+                  {t('locationPermissionDenied')}
+                </h3>
+              </div>
+              <div className="space-y-4 text-sm text-zinc-300">
+                <p className="bg-red-500/10 text-red-300 p-3 rounded-xl border border-red-500/20">
+                  {t('locationPermissionInstructions')}
+                </p>
+                <ul className="space-y-3">
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
+                    <span>{t('locationPermissionStep1')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
+                    <span>{t('locationPermissionStep2')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
+                    <span>{t('locationPermissionStep3')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
+                    <span>{t('locationPermissionStep4')}</span>
+                  </li>
+                </ul>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full mt-6 bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-red-900/20"
+                >
+                  {t('locationPermissionStep4')}
                 </button>
               </div>
             </div>

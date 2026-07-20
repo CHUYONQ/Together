@@ -37,6 +37,12 @@ const resources = {
       "backgroundInstructionsStep2": "2. Allow Location: Go to device Settings > Apps > Browser/Together > Permissions > Location > 'Allow all the time' (or 'Always').",
       "backgroundInstructionsStep3": "3. Unrestricted Battery: In Settings, allow 'Unrestricted' battery usage for this app to prevent it from sleeping.",
       "backgroundInstructionsStep4": "4. Keep Open: Leave the app running in your recent apps screen (do not swipe it away).",
+      "locationPermissionDenied": "Location Permission Needed",
+      "locationPermissionInstructions": "To track your location, you must allow location access. If denied, follow these steps to enable it:",
+      "locationPermissionStep1": "1. Tap the Lock (🔒) or Site Settings icon in your browser's address bar.",
+      "locationPermissionStep2": "2. Select 'Permissions' or 'Location'.",
+      "locationPermissionStep3": "3. Change the location permission to 'Allow'.",
+      "locationPermissionStep4": "4. Reload this page.",
       "close": "Close"
     }
   },
@@ -75,6 +81,12 @@ const resources = {
       "backgroundInstructionsStep2": "2. อนุญาตตำแหน่ง: ไปที่การตั้งค่าเครื่อง > แอป > เบราว์เซอร์/แอป > สิทธิ์ > ตำแหน่ง > 'อนุญาตตลอดเวลา' (หรือ 'เสมอ')",
       "backgroundInstructionsStep3": "3. แบตเตอรี่ไม่จำกัด: ในการตั้งค่า อนุญาตการใช้แบตเตอรี่แบบ 'ไม่จำกัด' (Unrestricted) เพื่อไม่ให้แอปหลับ",
       "backgroundInstructionsStep4": "4. เปิดแอปทิ้งไว้: ปล่อยให้แอปทำงานในพื้นหลัง (อย่าปัดทิ้งจากหน้า रिसेंटแอป)",
+      "locationPermissionDenied": "จำเป็นต้องใช้สิทธิ์ตำแหน่ง",
+      "locationPermissionInstructions": "เพื่อติดตามตำแหน่งของคุณ คุณต้องอนุญาตการเข้าถึงตำแหน่ง หากถูกปฏิเสธ ให้ทำตามขั้นตอนเหล่านี้:",
+      "locationPermissionStep1": "1. แตะไอคอนแม่กุญแจ (🔒) หรือการตั้งค่าเว็บไซต์ในแถบที่อยู่เบราว์เซอร์ของคุณ",
+      "locationPermissionStep2": "2. เลือก 'สิทธิ์' หรือ 'ตำแหน่ง'",
+      "locationPermissionStep3": "3. เปลี่ยนสิทธิ์ตำแหน่งเป็น 'อนุญาต'",
+      "locationPermissionStep4": "4. โหลดหน้านี้ใหม่",
       "close": "ปิด"
     }
   }
