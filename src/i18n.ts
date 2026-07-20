@@ -24,7 +24,14 @@ const resources = {
       "copied": "Copied!",
       "enableBackground": "Keep Alive in Background",
       "backgroundActive": "Background Tracking Active",
-      "backgroundHelp": "This attempts to keep tracking active even when the screen is off (uses silent audio & wake lock)."
+      "backgroundHelp": "This attempts to keep tracking active even when the screen is off (uses silent audio & wake lock).",
+      "shareCodeWithPartner": "Share your code with your partner:",
+      "showPairingSection": "Show pairing section",
+      "hidePairingSection": "Hide pairing section",
+      "displayName": "Your Display Name",
+      "updateName": "Update Name",
+      "nameUpdated": "Name updated!",
+      "time": "Time"
     }
   },
   th: {
@@ -49,7 +56,14 @@ const resources = {
       "copied": "คัดลอกแล้ว!",
       "enableBackground": "ทำงานเบื้องหลัง",
       "backgroundActive": "กำลังติดตามเบื้องหลัง",
-      "backgroundHelp": "พยายามทำงานแม้ปิดหน้าจอ (ใช้เสียงเงียบและการล็อคหน้าจอ)"
+      "backgroundHelp": "พยายามทำงานแม้ปิดหน้าจอ (ใช้เสียงเงียบและการล็อคหน้าจอ)",
+      "shareCodeWithPartner": "แชร์รหัสของคุณกับคู่ของคุณ:",
+      "showPairingSection": "แสดงส่วนจับคู่",
+      "hidePairingSection": "ซ่อนส่วนจับคู่",
+      "displayName": "ชื่อแสดงของคุณ",
+      "updateName": "อัปเดตชื่อ",
+      "nameUpdated": "อัปเดตชื่อแล้ว!",
+      "time": "เวลา"
     }
   }
 };

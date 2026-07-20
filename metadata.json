@@ -1,6 +1,6 @@
 {
   "name": "Our Map",
   "description": "Secure real-time location sharing app",
-  "requestFramePermissions": ["geolocation"],
+  "requestFramePermissions": ["geolocation", "screen-wake-lock"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

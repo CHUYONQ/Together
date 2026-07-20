@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { dbCustom } from './lib/firebase';
-import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { UserLocation, UserDoc } from './types';
+import { doc, updateDoc, setDoc, onSnapshot, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { UserLocation, UserDoc, HistoryPoint } from './types';
 
 export function useLocationTracker(uid: string | null, ghostMode: boolean) {
   const [partnerLocation, setPartnerLocation] = useState<UserLocation | null>(null);
   const [partnerUid, setPartnerUid] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const lastHistoryPointRef = useRef<HistoryPoint | null>(null);
 
   // 1. Listen to the current user's doc to get the partner's UID
   useEffect(() => {
@@ -35,6 +37,7 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
     const unsubscribe = onSnapshot(partnerDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as UserDoc;
+        setPartnerName(data.displayName || null);
         if (data.location) {
           setPartnerLocation(data.location);
         }
@@ -53,19 +56,58 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
       // If ghost mode is active, don't update Firebase
       if (ghostMode) return;
 
+      const now = Date.now();
       const userDocRef = doc(dbCustom, 'users', uid);
       try {
         await updateDoc(userDocRef, {
           location: {
             lat,
             lng,
-            timestamp: Date.now(),
+            timestamp: now,
             battery,
             ghostMode: false // We are tracking, so ghost mode is off
           }
         });
+
+        let shouldPushHistory = false;
+        const lastPt = lastHistoryPointRef.current;
+        if (!lastPt) {
+          shouldPushHistory = true;
+        } else {
+          const timeDiff = now - lastPt.timestamp;
+          const R = 6371e3; // metres
+          const φ1 = lastPt.lat * Math.PI / 180;
+          const φ2 = lat * Math.PI / 180;
+          const Δφ = (lat - lastPt.lat) * Math.PI / 180;
+          const Δλ = (lng - lastPt.lng) * Math.PI / 180;
+
+          const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+          const d = R * c; // in metres
+
+          // Push if moved more than 15 meters or 1 minute has passed
+          if (d > 15 || timeDiff > 60000) {
+            shouldPushHistory = true;
+          }
+        }
+
+        if (shouldPushHistory) {
+          const dateString = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+          const historyDocRef = doc(dbCustom, 'users', uid, 'history', dateString);
+          const newPoint = { lat, lng, timestamp: now };
+          await setDoc(historyDocRef, {
+            date: dateString,
+            points: arrayUnion(newPoint)
+          }, { merge: true });
+          
+          lastHistoryPointRef.current = newPoint;
+        }
+
       } catch (error) {
-        console.error('Error updating location:', error);
+        console.error('Error updating location (user or history doc):', error);
       }
     };
 
@@ -105,5 +147,5 @@ export function useLocationTracker(uid: string | null, ghostMode: boolean) {
     };
   }, [uid, ghostMode]);
 
-  return { partnerLocation, partnerUid, locationError };
+  return { partnerLocation, partnerUid, partnerName, locationError };
 }

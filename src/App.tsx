@@ -1,13 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { auth, dbCustom } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useLocationTracker } from './useLocationTracker';
 import { MapComponent } from './MapComponent';
-import { UserLocation, UserDoc } from './types';
-import { Ghost, Globe, Link2, Unlink, Copy, Check, ShieldAlert, Activity } from 'lucide-react';
+import { UserLocation, UserDoc, Geofence } from './types';
+import { Ghost, Globe, Link2, Unlink, Copy, Check, ShieldAlert, Activity, ChevronDown, ChevronUp, UserPen, Save, History, MapPin, X, Trash2 } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useLocationHistory } from './useLocationHistory';
+
+// Helper for distance calculation (in meters)
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371e3;
+  const p1 = lat1 * Math.PI/180;
+  const p2 = lat2 * Math.PI/180;
+  const dp = (lat2-lat1) * Math.PI/180;
+  const dl = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dp/2) * Math.sin(dp/2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(dl/2) * Math.sin(dl/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -19,12 +34,108 @@ function App() {
   const [myLocation, setMyLocation] = useState<UserLocation | null>(null);
   const [copied, setCopied] = useState(false);
   const [isBackgroundActive, setIsBackgroundActive] = useState(false);
+  const [showPairingSection, setShowPairingSection] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState('');
+  
+  // Geofence states
+  const [isMarkingLocation, setIsMarkingLocation] = useState(false);
+  const [newGeofenceDraft, setNewGeofenceDraft] = useState<Partial<Geofence> | null>(null);
+
+  const { partnerLocation, partnerUid, partnerName, locationError } = useLocationTracker(user?.uid || null, ghostMode);
+
+  const [partnerSpeed, setPartnerSpeed] = useState<number | null>(null);
+
+  // Keep track of previous partner location to detect crossings
+  const prevPartnerLocationRef = useRef<UserLocation | null>(null);
+  const notifiedGeofencesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Request notification permission if needed
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (partnerLocation) {
+      const currentLoc = partnerLocation;
+      const prevLoc = prevPartnerLocationRef.current;
+      
+      if (prevLoc && currentLoc.timestamp !== prevLoc.timestamp) {
+        // Calculate speed
+        const dist = getDistance(prevLoc.lat, prevLoc.lng, currentLoc.lat, currentLoc.lng);
+        const timeDiffSec = (currentLoc.timestamp - prevLoc.timestamp) / 1000;
+        
+        if (timeDiffSec > 0) {
+            const speedKmh = (dist / timeDiffSec) * 3.6;
+            setPartnerSpeed(speedKmh);
+        }
+
+        // Geofences logic
+        if (userDoc?.geofences) {
+          userDoc.geofences.forEach(gf => {
+            const wasInside = getDistance(prevLoc.lat, prevLoc.lng, gf.lat, gf.lng) <= gf.radius;
+            const isInside = getDistance(currentLoc.lat, currentLoc.lng, gf.lat, gf.lng) <= gf.radius;
+
+            if (gf.triggerOn === 'entry' || gf.triggerOn === 'both') {
+              if (!wasInside && isInside) {
+                notifyUser(`${partnerName || 'Partner'} entered ${gf.name}`);
+              }
+            }
+            if (gf.triggerOn === 'exit' || gf.triggerOn === 'both') {
+              if (wasInside && !isInside) {
+                notifyUser(`${partnerName || 'Partner'} left ${gf.name}`);
+              }
+            }
+          });
+        }
+      }
+      prevPartnerLocationRef.current = currentLoc;
+    }
+  }, [partnerLocation, userDoc?.geofences, partnerName]);
+
+  const notifyUser = (message: string) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(message);
+    } else {
+      alert(message);
+    }
+  };
+
+
+  const [historyViewTarget, setHistoryViewTarget] = useState<'mine' | 'partner'>('mine');
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
+  
+  const targetHistoryUid = historyViewTarget === 'mine' ? (user?.uid || null) : (partnerUid || null);
+  const { availableDates, historyPoints, isLoading: isHistoryLoading } = useLocationHistory(targetHistoryUid, selectedHistoryDate);
+
+  // Auto-select newest date when changing target if dates are available
+  useEffect(() => {
+    if (availableDates.length > 0 && !selectedHistoryDate) {
+      setSelectedHistoryDate(availableDates[0]);
+    } else if (availableDates.length === 0) {
+      setSelectedHistoryDate(null);
+    }
+  }, [availableDates, selectedHistoryDate]);
+
+  // Update display name input when userDoc changes
+  useEffect(() => {
+    if (userDoc?.displayName) {
+      setDisplayNameInput(userDoc.displayName);
+    }
+  }, [userDoc?.displayName]);
 
   const toggleBackgroundMode = async () => {
     if (!isBackgroundActive) {
       try {
         if ('wakeLock' in navigator) {
-          await (navigator as any).wakeLock.request('screen');
+          try {
+            await (navigator as any).wakeLock.request('screen');
+          } catch (wakeLockError) {
+            console.warn('Wake lock failed (often blocked in iframes), continuing with audio fallback:', wakeLockError);
+          }
         }
         
         // Play silent audio hack to try to keep process alive in background
@@ -54,7 +165,53 @@ function App() {
     },
   });
 
-  const { partnerLocation, partnerUid, locationError } = useLocationTracker(user?.uid || null, ghostMode);
+  const handleUpdateName = async () => {
+    if (!user || !displayNameInput.trim()) return;
+    try {
+      const userRef = doc(dbCustom, 'users', user.uid);
+      await updateDoc(userRef, { displayName: displayNameInput.trim() });
+      alert(t('nameUpdated'));
+    } catch (e) {
+      console.error("Error updating name", e);
+    }
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    if (isMarkingLocation) {
+      setNewGeofenceDraft({
+        id: Date.now().toString(),
+        lat,
+        lng,
+        radius: 100, // default 100m
+        triggerOn: 'both',
+        name: 'New Location'
+      });
+      setIsMarkingLocation(false);
+    }
+  };
+
+  const saveGeofence = async () => {
+    if (!user || !newGeofenceDraft) return;
+    try {
+      const userRef = doc(dbCustom, 'users', user.uid);
+      const currentGeofences = userDoc?.geofences || [];
+      await updateDoc(userRef, { geofences: [...currentGeofences, newGeofenceDraft as Geofence] });
+      setNewGeofenceDraft(null);
+    } catch (e) {
+      console.error("Error saving geofence", e);
+    }
+  };
+
+  const deleteGeofence = async (id: string) => {
+    if (!user) return;
+    try {
+      const userRef = doc(dbCustom, 'users', user.uid);
+      const currentGeofences = userDoc?.geofences || [];
+      await updateDoc(userRef, { geofences: currentGeofences.filter(gf => gf.id !== id) });
+    } catch (e) {
+      console.error("Error deleting geofence", e);
+    }
+  };
 
   // Authentication
   useEffect(() => {
@@ -210,7 +367,7 @@ function App() {
       {/* Update Toast */}
       {needRefresh && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-3">
-          <span className="text-sm font-medium">{t('updateAvailable')} (v1.0.3)</span>
+          <span className="text-sm font-medium">{t('updateAvailable')} (v1.0.5)</span>
           <button 
             onClick={() => updateServiceWorker(true)}
             className="bg-white text-blue-600 px-3 py-1.5 rounded text-sm font-bold shadow-sm"
@@ -224,9 +381,19 @@ function App() {
       <header className="h-16 border-b border-zinc-800/50 flex items-center justify-between px-4 sm:px-8 bg-[#0F0F12] z-10 shrink-0">
         <h1 className="font-serif italic text-xl tracking-wide text-zinc-200 flex items-center gap-2">
           {t('appTitle')}
-          <span className="text-[10px] font-mono bg-zinc-900 text-indigo-400 px-1.5 py-0.5 rounded border border-zinc-800">v1.0.3</span>
+          <span className="text-[10px] font-mono bg-zinc-900 text-indigo-400 px-1.5 py-0.5 rounded border border-zinc-800">v1.0.5</span>
         </h1>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMarkingLocation(!isMarkingLocation)}
+            className={`p-2 rounded-full transition-colors flex items-center gap-2 text-xs font-medium ${
+              isMarkingLocation ? 'bg-pink-900/50 text-pink-400 border border-pink-500/30' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+            }`}
+            title="Mark Location"
+          >
+            <MapPin size={16} />
+            <span className="hidden sm:inline">{isMarkingLocation ? 'Cancel Marking' : 'Mark Area'}</span>
+          </button>
           <button
             onClick={toggleBackgroundMode}
             className={`p-2 rounded-full transition-colors flex items-center gap-2 text-xs font-medium ${
@@ -243,15 +410,209 @@ function App() {
           >
             <Globe size={20} />
           </button>
+          <button 
+            onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
+            className={`p-2 rounded-full transition-colors ${showHistory ? 'bg-indigo-900/50 text-indigo-400' : 'hover:bg-zinc-800 text-zinc-400'}`}
+            title="History"
+          >
+            <History size={20} />
+          </button>
+          <button 
+            onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
+            className={`p-2 rounded-full transition-colors ${showSettings ? 'bg-indigo-900/50 text-indigo-400' : 'hover:bg-zinc-800 text-zinc-400'}`}
+          >
+            <UserPen size={20} />
+          </button>
         </div>
       </header>
 
+      {/* History Panel */}
+      {showHistory && (
+        <div className="bg-[#0F0F12] border-b border-zinc-800/50 p-4 z-10 shrink-0 shadow-lg">
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="flex gap-2 p-1 bg-zinc-900/50 rounded-xl border border-zinc-800">
+              <button
+                onClick={() => { setHistoryViewTarget('mine'); setSelectedHistoryDate(null); }}
+                className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-colors ${historyViewTarget === 'mine' ? 'bg-indigo-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+              >
+                My History
+              </button>
+              <button
+                onClick={() => { setHistoryViewTarget('partner'); setSelectedHistoryDate(null); }}
+                disabled={!isPaired}
+                className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-colors ${historyViewTarget === 'partner' ? 'bg-indigo-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'} disabled:opacity-30`}
+              >
+                Partner's History
+              </button>
+            </div>
+            
+            <div>
+              {availableDates.length > 0 ? (
+                <select
+                  value={selectedHistoryDate || ''}
+                  onChange={(e) => setSelectedHistoryDate(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  <option value="" disabled>Select Date</option>
+                  {availableDates.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-center text-zinc-500 text-sm py-2">No history available</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-[#0F0F12] border-b border-zinc-800/50 p-4 z-10 shrink-0 shadow-lg max-h-[50vh] overflow-y-auto custom-scrollbar">
+          <div className="max-w-md mx-auto space-y-6">
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Profile</h3>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <UserPen className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder={t('displayName')}
+                    value={displayNameInput}
+                    onChange={(e) => setDisplayNameInput(e.target.value)}
+                    className="w-full border border-zinc-800 bg-zinc-900/50 text-zinc-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-zinc-500"
+                  />
+                </div>
+                <button
+                  onClick={handleUpdateName}
+                  disabled={!displayNameInput.trim() || displayNameInput === userDoc?.displayName}
+                  className="bg-zinc-800 text-zinc-300 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                  title={t('updateName')}
+                >
+                  <Save size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <span>Marked Areas</span>
+                <span className="bg-zinc-800 px-2 py-0.5 rounded-full text-[10px] text-zinc-400">{userDoc?.geofences?.length || 0}</span>
+              </h3>
+              
+              <div className="space-y-2">
+                {!userDoc?.geofences || userDoc.geofences.length === 0 ? (
+                  <div className="text-center py-4 bg-zinc-900/30 rounded-xl border border-zinc-800/50 border-dashed">
+                    <MapPin className="mx-auto text-zinc-600 mb-2" size={20} />
+                    <p className="text-xs text-zinc-500">No areas marked yet.</p>
+                    <p className="text-[10px] text-zinc-600 mt-1">Click the MapPin icon above to create one.</p>
+                  </div>
+                ) : (
+                  userDoc.geofences.map(gf => (
+                    <div key={gf.id} className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-pink-300">{gf.name}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          {gf.radius}m • Notify on {gf.triggerOn === 'both' ? 'Arrival & Departure' : gf.triggerOn}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => deleteGeofence(gf.id)}
+                        className="p-2 text-red-400/70 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                        title="Delete Area"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1 relative">
-        <MapComponent userLocation={myLocation} partnerLocation={partnerLocation} />
+        <MapComponent 
+          userLocation={myLocation} 
+          partnerLocation={partnerLocation} 
+          userName={userDoc?.displayName}
+          partnerName={partnerName || undefined}
+          historyPoints={showHistory ? historyPoints : undefined}
+          historyColor={historyViewTarget === 'mine' ? '#818cf8' : '#a1a1aa'}
+          geofences={userDoc?.geofences}
+          isMarkingLocation={isMarkingLocation}
+          onMapClick={handleMapClick}
+          partnerSpeed={partnerSpeed}
+        />
         {locationError && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-900/90 backdrop-blur border border-red-800 px-6 py-2 rounded-full shadow-2xl z-[1000] flex items-center gap-2">
             <span className="text-xs font-medium text-red-200">Location Error: {locationError}</span>
+          </div>
+        )}
+
+        {/* Geofence Draft Overlay */}
+        {newGeofenceDraft && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur-md border border-zinc-700/50 p-5 rounded-2xl shadow-2xl z-[2000] w-[90%] max-w-sm">
+            <h3 className="text-white font-medium mb-4 flex items-center justify-between">
+              Configure Area
+              <button onClick={() => setNewGeofenceDraft(null)} className="text-zinc-400 hover:text-white p-1">
+                <X size={18} />
+              </button>
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Name</label>
+                <input 
+                  type="text" 
+                  value={newGeofenceDraft.name} 
+                  onChange={e => setNewGeofenceDraft({ ...newGeofenceDraft, name: e.target.value })}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500"
+                  placeholder="Home, Work, etc."
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Radius: {newGeofenceDraft.radius}m</label>
+                <input 
+                  type="range" 
+                  min="50" 
+                  max="5000" 
+                  step="50"
+                  value={newGeofenceDraft.radius} 
+                  onChange={e => setNewGeofenceDraft({ ...newGeofenceDraft, radius: parseInt(e.target.value) })}
+                  className="w-full accent-pink-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-500 mt-1">
+                  <span>Small</span>
+                  <span>Large</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Notify me when partner...</label>
+                <div className="flex gap-2">
+                  {(['entry', 'exit', 'both'] as const).map(trigger => (
+                    <button
+                      key={trigger}
+                      onClick={() => setNewGeofenceDraft({ ...newGeofenceDraft, triggerOn: trigger })}
+                      className={`flex-1 py-1.5 text-xs rounded-md font-medium capitalize border ${
+                        newGeofenceDraft.triggerOn === trigger 
+                          ? 'bg-pink-500/20 border-pink-500 text-pink-300' 
+                          : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                    >
+                      {trigger === 'both' ? 'Arrives/Leaves' : trigger === 'entry' ? 'Arrives' : 'Leaves'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button 
+                onClick={saveGeofence}
+                className="w-full bg-pink-600 hover:bg-pink-500 text-white font-medium py-2 rounded-lg mt-2 transition-colors shadow-lg shadow-pink-900/20"
+              >
+                Save Marked Area
+              </button>
+            </div>
           </div>
         )}
       </main>
@@ -260,20 +621,30 @@ function App() {
       <div className="bg-[#0F0F12] border-t border-zinc-800/50 p-4 shrink-0 z-10 rounded-t-2xl">
         {!isPaired ? (
           <div className="space-y-4">
-            <div className="p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/20">
-              <p className="text-sm text-indigo-300 font-medium mb-2">Share your code with your partner:</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-zinc-900 px-3 py-2 rounded-lg text-sm font-mono text-zinc-300 border border-zinc-800 truncate">
-                  {user.uid}
-                </code>
-                <button 
-                  onClick={copyMyCode}
-                  className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors shrink-0 shadow-lg shadow-indigo-900/20"
-                >
-                  {copied ? <Check size={20} /> : <Copy size={20} />}
-                </button>
+            <button 
+              onClick={() => setShowPairingSection(!showPairingSection)}
+              className="w-full flex items-center justify-between p-3 bg-zinc-900/30 border border-zinc-800/50 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors"
+            >
+              <span>{showPairingSection ? t('hidePairingSection') : t('showPairingSection')}</span>
+              {showPairingSection ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
+
+            {showPairingSection && (
+              <div className="p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/20">
+                <p className="text-sm text-indigo-300 font-medium mb-2">{t('shareCodeWithPartner')}</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-zinc-900 px-3 py-2 rounded-lg text-sm font-mono text-zinc-300 border border-zinc-800 truncate">
+                    {user.uid}
+                  </code>
+                  <button 
+                    onClick={copyMyCode}
+                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors shrink-0 shadow-lg shadow-indigo-900/20"
+                  >
+                    {copied ? <Check size={20} /> : <Copy size={20} />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

@@ -16,8 +16,14 @@ export default defineConfig(() => {
           name: 'Our Map',
           short_name: 'Our Map',
           description: 'A private real-time location tracker',
-          theme_color: '#ffffff',
-          icons: []
+          theme_color: '#0F0F12',
+          icons: [
+            {
+              src: 'icon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml'
+            }
+          ]
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}']
